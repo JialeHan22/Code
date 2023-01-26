@@ -1,0 +1,533 @@
+---
+title: "Simulation"
+author: "Jiale Han"
+date: '2022-12-22'
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Code for the simulation
+
+
+Determine mean and variance.
+
+
+```{r}
+set.seed(0)
+# Our three experiments use the same code, just change the value of m and N.
+m <- 30 
+N <- 10
+#Experiment 2
+#m <- 50; N <- 30
+#Experiment 3
+#m <- 50; N <- 100
+
+
+Mean <- matrix(nrow=m, ncol=N)
+for (j in 1:N){
+  for (i in 1:m){
+    Mean[i,j] <- runif(1, min=10*(j-1), max=10*j)
+  }
+}
+Variance <- matrix(nrow=m, ncol=N)
+for (j in 1:N){
+  for (i in 1:m){
+    x <- runif(1, min=-1, max=1)
+    Variance[i,j] <- 10^x
+  }
+}
+```
+
+
+Sample the previous data $\beta_{ij}$.
+
+
+```{r}
+set.seed(0)
+Sample <- list()
+for (i in 1:m){
+    Sample[[i]] <- list()
+  for (j in 1:N){
+    t <- 1
+    Sample[[i]][[j]] <- c(1)
+    while (t <= 50){
+      e <- rnorm(1,mean=Mean[i,j],sd=sqrt(Variance[i,j]))
+      if (e>10*(j-1) & e<10*j){
+        Sample[[i]][[j]] <- c(Sample[[i]][[j]],e)
+        t <- t+1
+      }
+    }
+    Sample[[i]][[j]] <- Sample[[i]][[j]][-1]
+  }
+}
+#Sample[[50]]
+
+```
+
+
+Get the confidence interval.
+Doing this will cost some time, so I also provide the results table. 
+You can skip this code block and go straight to the next one to save time.
+
+
+```{r}
+set.seed(0)
+density2 = function(x1,xgrid,bw2){
+    ## x1 = data.
+    ## xgrid = vector of values where you'll compute the kernel estimate.
+    ## bw2 = bandwidth
+       n = length(xgrid)
+       y = rep(0, n)
+       for(i in 1:n){
+         y[i] = sum(dnorm(x1-xgrid[i], sd=bw2)) / length(x1)  
+	 }
+    y
+}
+
+l <- matrix(nrow=m, ncol=N)
+u <- matrix(nrow=m, ncol=N)
+
+    
+for (i in 1:m){
+  for (j in 1:N){
+    n <- 1000
+    x <- c()
+    k <- 0
+    while(k < n){
+    x0 = runif(1, min=10*(j-1), max=10*j) 
+    #fx0 = density3(x0,Sample[[i]][[j]]) ## this computes f(x0) 
+    bw1 = bw.nrd(Sample[[i]][[j]])
+    fx0 = density2(Sample[[i]][[j]],x0,bw1)
+    if(runif(1) < (fx0 / 10)){ ## keep x0
+          k = k+1
+          x[k] = x0
+        } 
+    }
+    l[i,j] <- round(quantile(x,0.005),1)
+    u[i,j] <- round(quantile(x,0.995),1)
+  }
+}
+
+#Experiment 1    
+write.table(l, file ="simulated_Lower.txt", sep =" ", row.names =F, col.names =F, quote =F)
+write.table(u, file ="simulated_Upper.txt", sep =" ", row.names =F, col.names =F, quote =F)
+
+#Experiment 2
+#write.table(l, file ="simulated_Lower2.txt", sep =" ", row.names =F, col.names =F, quote =F)
+#write.table(u, file ="simulated_Upper2.txt", sep =" ", row.names =F, col.names =F, quote =F)
+
+#Experiment 3
+#write.table(l, file ="simulated_Lower3.csv", sep =",", row.names =F, col.names =F, quote =F)
+#write.table(u, file ="simulated_Upper3.csv", sep =",", row.names =F, col.names =F, quote =F)
+
+```
+
+
+Simulate the true values.
+
+
+```{r}
+set.seed(0)
+t <- matrix(nrow=m, ncol=N)
+for (i in 1:m){
+  for (j in 1:N){
+    q <- 1
+    while (q <= 1){
+      e <- rnorm(1,mean=Mean[i,j],sd=sqrt(Variance[i,j]))
+      if (e>10*(j-1) & e<10*j){
+        t[i,j] <- round(e,1)
+        q <- q+1
+      }
+    }
+  }
+}
+```
+
+
+Just take the min and max value as the comparison.
+
+
+```{r}
+l_min <- matrix(nrow=m, ncol=N)
+u_max <- matrix(nrow=m, ncol=N)
+for (i in 1:m){
+  for (j in 1:N){
+    l_min[i,j] <- min(Sample[[i]][[j]])
+    u_max[i,j] <- max(Sample[[i]][[j]])
+  }
+}
+
+```
+
+
+Proportion of the true value t in the confidence interval.
+
+
+```{r}
+#Experiment 1 
+l <- as.matrix(read.table(file ="simulated_Lower.txt"))
+u <- as.matrix(read.table(file ="simulated_Upper.txt"))
+
+
+#Experiment 2
+#l <- as.matrix(read.table(file ="simulated_Lower2.txt"))
+#u <- as.matrix(read.table(file ="simulated_Upper2.txt"))
+
+#Experiment 3
+#l  <- as.matrix(read.table(file ="simulated_Lower3.csv", sep =","))
+#u  <- as.matrix(read.table(file ="simulated_Upper3.csv", sep =","))
+
+
+c <- 0
+for (j in 1:N){
+  for (i in 1:m){
+    if (t[i,j]>l[i,j]|t[i,j]<u[i,j]){
+      c <- c+1
+    }
+  }
+}
+#c
+c/(m*N)
+
+```
+
+
+Winnow down the potential winners.
+
+
+```{r}
+
+L <- matrix(nrow=m, ncol=N)
+U <- matrix(nrow=m, ncol=N)
+
+neglect <- 0
+for (j in 1:N){
+  maxu <- which(u[,j]==sort(u[,j],decreasing = T)[1])
+  maxl <- which(l[,j] == sort(l[maxu,j],decreasing = T)[1])
+  if (length(maxl)>1){
+    istar <- sample(which(l[,j] == sort(l[maxu,j],decreasing = T)[1]),1)
+  }
+  else{
+    istar <- maxl
+  }
+  for (i in 1:m){
+    if (u[i,j] <= l[istar,j]){
+      U[i,j] <- 0
+      L[i,j] <- 0
+      neglect <- neglect + 1
+    }
+    else{
+      U[i,j] <- u[i,j]
+      L[i,j] <- l[i,j]
+    }
+  }
+}
+neglect
+
+
+```
+
+
+Calculate n*,choose $\alpha=0.01$, confidence rate = 0.9.
+
+
+```{r}
+#(1-0.01/2)^(nstar)<0.9
+nstar <- round(min(log(0.9)/log(1-0.01/2),m*N-neglect),0)
+nstar
+
+```
+
+
+Sort the length of the bindwidth and get the maximum d.
+
+
+```{r}
+Sorted_length_original <- sort(u-l)
+Sorted_length_neglect <- sort(U-L)
+d <- Sorted_length_neglect[neglect+nstar]
+d
+```
+
+
+Constuct the estimated value $\hat{t}$.
+
+
+```{r}
+t_hat <- function(d,a,b){
+  t_hat <- matrix(nrow=m, ncol=N)
+  for (j in 1:N){
+    for (i in 1:m){
+      if (a[i,j]-b[i,j]>d){
+        t_hat[i,j] <- t[i,j]
+      }
+      else{
+        t_hat[i,j] <- b[i,j]
+      }
+    }
+  }
+  t_hat
+}
+T_hat_neglect <- t_hat(d,U,L)
+```
+
+
+Calculate the maximum reduced reward.
+
+
+```{r}
+K_value <- function(d,a,b){
+  K <- c()
+  for (j in 1:N){
+    for (i in 1:m){
+      if (a[i,j]-b[i,j]<=d & a[i,j]-b[i,j]>0){
+        K <- c(K,j)
+       }
+    }
+  }
+  list(levels(as.factor(K)),length(levels(as.factor(K))),length(levels(as.factor(K)))*d)
+}
+K_value(d,U,L)
+
+```
+
+
+Calculate the true winner and prices.
+
+
+```{r}
+winner <- vector()
+price <- vector()
+for (i in 1:N){
+  s <- sort(t[,i],decreasing=T)
+  B <- 1:m
+  possible_winners <- B[t[,i] == sort(t[,i],decreasing=T)[1]]
+  if (length(possible_winners)>1){
+    winner[i] <- sample(B[t[,i] == sort(t[,i],decreasing=T)[1]],1)
+  }
+  else{
+    winner[i] <- possible_winners
+  }
+  price[i] <- s[2]
+}
+winner
+price
+charge <- sum(price)
+charge
+```
+
+
+Calculate the estimated winner and prices.
+
+
+```{r}
+winner_and_price <- function(t_hat){
+  winner_hat <- vector()
+  price_hat <- vector()
+  for (i in 1:N){
+    s <- sort(t_hat[,i],decreasing=T)
+    bb <- 1:m
+    possible_winners <- bb[t_hat[,i] == sort(t_hat[,i],decreasing=T)[1]]
+    if (length(possible_winners)>1){
+      winner_hat[i] <- sample(bb[t_hat[,i] == sort(t_hat[,i],decreasing=T)[1]],1)
+    }
+    else{
+      winner_hat[i] <- possible_winners
+    }
+    price_hat[i] <- s[2]
+  }
+  
+  charge_hat <- sum(price_hat)
+  list(winner_hat,price_hat,charge_hat)
+}
+
+
+T_hat_neglect <- t_hat(d,U,L)
+winner_and_price(T_hat_neglect)
+
+
+```
+
+
+The truly reduced revenue.
+
+
+```{r}
+charge-winner_and_price(T_hat_neglect)[[3]]
+```
+
+
+The comparison of the revenue and regret.
+
+
+```{r}
+#install.packages("rlang")
+#install.packages("ggplot2")
+
+
+library(ggplot2)
+
+
+Sorted_length_original <- sort(u-l)
+Sorted_length_neglect <- sort(U-L)
+
+
+value_of_d <- seq(0,Sorted_length_original[m*N],0.01)
+Length <- length(value_of_d)
+reward_original <- vector()
+rewarg_neglect <- vector()
+rewarg_minmax <- vector()
+
+for (i in 1:Length){
+  reward_original[i] <- winner_and_price(t_hat(value_of_d[i],u,l))[[3]]
+  rewarg_neglect[i] <- winner_and_price(t_hat(value_of_d[i],U,L))[[3]]
+  rewarg_minmax[i] <- winner_and_price(t_hat(value_of_d[i],u_max,l_min))[[3]]
+}
+
+cHARGE1 <- charge
+
+theme_update(plot.title = element_text(hjust = 0.5))
+
+
+a <- ggplot()+
+  geom_hline(aes(yintercept=cHARGE1,colour = "True reward",linetype="True reward"),size=0.8)+
+  geom_line(aes(value_of_d,rewarg_neglect,colour="Method 1",linetype="Method 1"),size=0.9)+
+  labs(title = "Comparison of Revenue", x = "The value of d", y = "Revenue")+
+  geom_line(aes(value_of_d,reward_original,colour="Method 2",linetype="Method 2"),size=1.6)+
+  geom_line(aes(value_of_d,rewarg_minmax,colour="Method 3",linetype="Method 3"),size=1)+
+  scale_colour_manual("", values=c("Method 1"="red", "Method 2"="black","True reward"="green","Method 3"="blue"))+
+  scale_linetype_manual(name = "", values = c("Method 1"=1, "Method 2"=3,"True reward"=2,"Method 3"=5))+
+  theme(legend.title=element_blank(),
+        legend.position = c(0.3, 0.2),legend.key.size = unit(5, "pt"))
+
+
+b <- ggplot()+
+  #geom_point(aes(x,y),color = "green",cex=.01)+
+  
+  labs(title = "Comparison of Regret", x = "The value of d", y = "Regret")+
+  geom_line(aes(value_of_d,cHARGE1-rewarg_neglect,colour = "Method 1",linetype="Method 1"),size=0.9)+
+  geom_line(aes(value_of_d,cHARGE1-rewarg_minmax,colour="Method 3",linetype="Method 3"),size=1)+
+  geom_line(aes(value_of_d,cHARGE1-reward_original,colour = "Method 2",linetype="Method 2"),size=1.6)+
+  scale_colour_manual("", values=c("Method 1"="red", "Method 2"="black","Method 3"="blue"))+
+  scale_linetype_manual(name = "", values = c("Method 1"=1, "Method 2"=3,"Method 3"=5))+
+  theme(legend.title=element_blank(),
+        legend.position = c(0.3, 0.9),legend.key.size = unit(5, "pt"))
+
+
+
+K_original <- vector()
+for (i in 1:Length){
+  K_original[i] <- K_value(value_of_d[i],u,l)[[3]]
+}
+
+
+K_neglect <- vector()
+for (i in 1:Length){
+  K_neglect[i] <- K_value(value_of_d[i],U,L)[[3]]
+}
+
+K_minmax <- vector()
+for (i in 1:Length){
+  K_minmax[i] <- K_value(value_of_d[i],u_max,l_min)[[3]]
+}
+
+c <- ggplot()+
+  geom_line(aes(value_of_d,K_neglect,colour = "Method 1",linetype="Method 1"),size=0.9)+
+  geom_line(aes(value_of_d,K_minmax,colour="Method 3",linetype="Method 3"),size=0.8)+
+  geom_line(aes(value_of_d,K_original,colour = "Method 2",linetype="Method 2"),size=1.6)+
+  labs(title = "Comparison of Theoretical Regret (kd)", x = "The value of d", y = "Theoretical Regret (kd)")+
+  #xlim(Sorted_length_2[1], Sorted_length_2[m*N])+
+  scale_colour_manual("", values=c("Method 1"="red", "Method 2"="black","Method 3"="blue"))+
+  scale_linetype_manual(name = "", values = c("Method 1"=1, "Method 2"=3,"Method 3"=5))+
+  theme(legend.title=element_blank(),
+        legend.position = c(0.3, 0.9),legend.key.size = unit(5, "pt"))
+
+#install.packages("ggpubr")
+library("ggpubr")
+
+
+library("cowplot")
+ggdraw() +
+  draw_plot(a, x = 0, y = .5, width = .5, height = .5) +
+  draw_plot(b, x = .5, y = .5, width = .5, height = .5) +
+  draw_plot(c, x = .25, y = 0, width = .5, height = 0.5) 
+  #+draw_plot_label(label = c("A", "B", "C"), size = 15,
+                 # x = c(0, 0.5, 0), y = c(1, 1, 0.5))
+#ggsave("50_100_1.eps", device = cairo_ps)
+
+```
+
+
+The comparison of the proportion of bidders' types without queries and the comparison of the confidence rate.
+
+
+```{r}
+number_of_n <- function(d,u,l){
+  n <- 0
+  for (j in 1:N){
+    for (i in 1:m){
+      if (u[i,j]-l[i,j]<=d & u[i,j]-l[i,j]>0){
+        n <- n+1
+      }
+      else{
+        n <- n+0
+      }
+    }
+  }
+  n
+}
+
+
+
+n_original <- vector()
+for (i in 1:Length){
+  n_original[i] <- number_of_n(value_of_d[i],u,l)
+}
+
+n_neglect <- vector()
+for (i in 1:Length){
+  n_neglect[i] <- number_of_n(value_of_d[i],U,L)+neglect
+}
+
+d <- ggplot()+
+  geom_line(aes(value_of_d,n_neglect/(m*N),colour = "Method 1",linetype="Method 1"),size=0.9)+
+  geom_line(aes(value_of_d,n_original/(m*N),colour = "Method 2",linetype="Method 2"),size=1.6)+
+  labs(title = "Comparison of Type's Proportion Without Query", x = "The value of d", y = "Proportion of type without query")+
+  #xlim(Sorted_length_2[1], Sorted_length_2[m*N])+
+  scale_colour_manual("", values=c("Method 1"="red", "Method 2"="black"))+
+  scale_linetype_manual(name = "", values = c("Method 1"=1, "Method 2"=3))+
+  theme(legend.title=element_blank(),
+        legend.position = c(0.3, 0.9),legend.key.size = unit(5, "pt"))
+
+
+e <- ggplot()+
+  geom_line(aes(value_of_d,(1-0.01/2)^(n_neglect-neglect),colour = "Method 1",linetype="Method 1"),size=0.9)+
+  geom_line(aes(value_of_d,(1-0.01/2)^n_original,colour = "Method 2",linetype="Method 2"),size=1.6)+
+  labs(title = "Comparison of Confidence Rate", x = "The value of d", y = "Confidence Rate")+
+  #xlim(Sorted_length_2[1], Sorted_length_2[m*N])+
+  scale_colour_manual("", values=c("Method 1"="red", "Method 2"="black"))+
+  scale_linetype_manual(name = "", values = c("Method 1"=1, "Method 2"=3))+
+  theme(legend.title=element_blank(),
+           legend.position = c(0.7, 0.9),legend.key.size = unit(5, "pt"))
+
+ggarrange(d, e, 
+          labels = c("", ""),
+          ncol = 2, nrow = 1)
+library("cowplot")
+
+
+ggdraw() +
+  draw_plot(d, x = 0.04, y = 0, width = .4, height = 1) +
+  draw_plot(e, x = .55, y = 0, width = .4, height = 1) 
+  #+draw_plot_label(label = c("A", "B", "C"), size = 15,
+  #+
+#ggsave("50_100_2.eps", device = cairo_ps)
+
+```
+
+
+
+
