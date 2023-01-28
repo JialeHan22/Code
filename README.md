@@ -9,4 +9,4 @@ The results table simulated_Lower.txt and simulated_Upper.txt are the lower boun
 
 The results table simulated_Lower2.txt and simulated_Upper2.txt are the lower bound and upper bound table when m=50, N=30.
 
-The results table simulated_Lower3.txt and simulated_Upper3.txt are the lower bound and upper bound table when m=50, N=100.
+The results table simulated_Lower3.csv and simulated_Upper3.csv are the lower bound and upper bound table when m=50, N=100.
