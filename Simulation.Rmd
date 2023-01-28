@@ -63,7 +63,6 @@ for (i in 1:m){
     Sample[[i]][[j]] <- Sample[[i]][[j]][-1]
   }
 }
-#Sample[[50]]
 
 ```
 
