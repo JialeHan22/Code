@@ -1,5 +1,5 @@
 ---
-title: "Simulation"
+title: "Experiments"
 author: "Jiale Han"
 date: '2022-12-22'
 output: pdf_document
